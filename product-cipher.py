@@ -13,14 +13,14 @@ def apply_sbox(byte):
     low_nibble = byte & 0xF
     return (SBOX[high_nibble] << 4) | SBOX[low_nibble]
 
+# Apply S-box substitution to each byte in the 16-bit block
 def substitute(block):
-    """ Apply S-box substitution to each byte in the 16-bit block """
     high_byte = apply_sbox((block >> 8) & 0xFF)
     low_byte = apply_sbox(block & 0xFF)
     return (high_byte << 8) | low_byte
 
+# Bit-level permutation for diffusion
 def transpose(block):
-    """ Bit-level permutation for diffusion """
     permuted = 0
     permutation = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15]
     for i in range(16):
@@ -28,16 +28,16 @@ def transpose(block):
         permuted |= (bit << permutation[i])
     return permuted
 
+# Encrypt a 16-bit block using substitution and transposition
 def encrypt_block(block, rounds=4):
-    """ Encrypt a 16-bit block using substitution and transposition """
     state = block
     for _ in range(rounds):
         state = substitute(state)
         state = transpose(state)
     return state
 
+# Decrypt a 16-bit block (reverse order of encryption)
 def decrypt_block(block, rounds=4):
-    """ Decrypt a 16-bit block (reverse order of encryption) """
     inverse_sbox = [SBOX.index(i) for i in range(16)]
     
     def inverse_sbox_substitution(byte):
@@ -55,20 +55,16 @@ def decrypt_block(block, rounds=4):
         state = (high_byte << 8) | low_byte
     return state
 
+# Convert string to list of 16-bit blocks
 def string_to_blocks(text):
-    """ Convert string to list of 16-bit blocks """
     if len(text) % 2 != 0:
-        text += " "  # Padding if not even length
+        text += " "
     
     blocks = [int.from_bytes(text[i:i+2].encode(), 'big') for i in range(0, len(text), 2)]
     return blocks
 
-def blocks_to_string(blocks):
-    """ Convert 16-bit blocks back to string """
-    return "".join([struct.pack('>H', block).decode(errors='ignore') for block in blocks])
-
+# Compute the Strict Avalanche Criterion (SAC) for a given plaintext block
 def calculate_SAC(block, rounds=4):
-    """ Compute the Strict Avalanche Criterion (SAC) for a given plaintext block """
     original_ciphertext = encrypt_block(block, rounds)
     bit_changes = []
 
@@ -84,12 +80,12 @@ def calculate_SAC(block, rounds=4):
     average_flip = (sum(bit_changes) / (16 * 16)) * 100
     return average_flip
 
+# Convert a list of ciphertexts into a matrix where each row is a binary representation.
 def bitwise_matrix(ciphertexts):
-    """ Convert a list of ciphertexts into a matrix where each row is a binary representation. """
     return np.array([[int(b) for b in f'{ct:016b}'] for ct in ciphertexts])
 
+# Compute the Bit Independence Criterion (BIC) for a given plaintext block.
 def calculate_BIC(block, rounds=4):
-    """ Compute the Bit Independence Criterion (BIC) for a given plaintext block. """
     original_ciphertext = encrypt_block(block, rounds)
     flipped_ciphertexts = []
 
@@ -99,7 +95,7 @@ def calculate_BIC(block, rounds=4):
         flipped_ciphertexts.append(modified_ciphertext)
 
     # Convert ciphertexts into a matrix
-    # original_bits = np.array([int(b) for b in f'{original_ciphertext:016b}'])
+    original_bits = np.array([int(b) for b in f'{original_ciphertext:016b}'])
     flipped_matrix = bitwise_matrix(flipped_ciphertexts)
 
     # Compute correlations between ciphertext bit flips
@@ -112,11 +108,10 @@ def calculate_BIC(block, rounds=4):
     return avg_correlation
 
 def main():
-    plaintext = "Hello"
+    plaintext = "Hi"
     
     # Convert text to 16-bit blocks
     blocks = string_to_blocks(plaintext)
-    
     print(f"Original Blocks: {[bin(b) for b in blocks]}")
     
     # Encrypt
@@ -125,15 +120,14 @@ def main():
     
     # Decrypt
     decrypted_blocks = [decrypt_block(b) for b in encrypted_blocks]
-    decrypted_text = blocks_to_string(decrypted_blocks)
-    
     print(f"Decrypted Blocks: {[bin(b) for b in decrypted_blocks]}")
-    print(f"Decrypted Text: {decrypted_text}")
     
+    # Calculate SAC
     for block in blocks:
         sac = calculate_SAC(block)
         print(f"SAC for block {bin(block)}: {sac:.2f}%")
         
+    # Calculate BIC
     for block in blocks:
         bic = calculate_BIC(block)
         print(f"BIC for block {bin(block)}: {bic:.4f} (Ideal: ~0)")
