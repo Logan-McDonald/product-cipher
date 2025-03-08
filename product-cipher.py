@@ -1,8 +1,6 @@
-import struct
-import random
 import numpy as np
 
-# Sample S-box for substitution (fixed mapping)
+# S-box functions
 SBOX = [
     0x3, 0xF, 0xE, 0x1, 0xD, 0x8, 0xB, 0x6,
     0x4, 0xA, 0x7, 0xC, 0x2, 0x9, 0x5, 0x0
@@ -36,7 +34,7 @@ def encrypt_block(block, rounds=4):
         state = transpose(state)
     return state
 
-# Decrypt a 16-bit block (reverse order of encryption)
+# Decrypt a 16-bit block
 def decrypt_block(block, rounds=4):
     inverse_sbox = [SBOX.index(i) for i in range(16)]
     
@@ -47,9 +45,7 @@ def decrypt_block(block, rounds=4):
 
     state = block
     for _ in range(rounds):
-        # Reverse transposition
         state = transpose(state)
-        # Reverse substitution
         high_byte = inverse_sbox_substitution((state >> 8) & 0xFF)
         low_byte = inverse_sbox_substitution(state & 0xFF)
         state = (high_byte << 8) | low_byte
@@ -63,45 +59,33 @@ def string_to_blocks(text):
     blocks = [int.from_bytes(text[i:i+2].encode(), 'big') for i in range(0, len(text), 2)]
     return blocks
 
-# Compute the Strict Avalanche Criterion (SAC) for a given plaintext block
+# Compute the SAC for a given plaintext block
 def calculate_SAC(block, rounds=4):
     original_ciphertext = encrypt_block(block, rounds)
     bit_changes = []
 
-    for i in range(16):  # Flip each bit one at a time
-        modified_block = block ^ (1 << i)  # Flip the i-th bit
+    for i in range(16):
+        modified_block = block ^ (1 << i)
         modified_ciphertext = encrypt_block(modified_block, rounds)
         
-        # Count number of bits changed in the ciphertext
         bit_diff = bin(original_ciphertext ^ modified_ciphertext).count('1')
         bit_changes.append(bit_diff)
 
-    # Compute the average percentage of bit flips
     average_flip = (sum(bit_changes) / (16 * 16)) * 100
     return average_flip
 
-# Convert a list of ciphertexts into a matrix where each row is a binary representation.
-def bitwise_matrix(ciphertexts):
-    return np.array([[int(b) for b in f'{ct:016b}'] for ct in ciphertexts])
-
-# Compute the Bit Independence Criterion (BIC) for a given plaintext block.
+# Compute the BIC for a given plaintext block.
 def calculate_BIC(block, rounds=4):
-    original_ciphertext = encrypt_block(block, rounds)
     flipped_ciphertexts = []
 
-    for i in range(16):  # Flip each bit one at a time
-        modified_block = block ^ (1 << i)  # Flip the i-th bit
+    for i in range(16):
+        modified_block = block ^ (1 << i)
         modified_ciphertext = encrypt_block(modified_block, rounds)
         flipped_ciphertexts.append(modified_ciphertext)
+        
+    flipped_matrix = np.array([[int(b) for b in f'{ct:016b}'] for ct in flipped_ciphertexts])
+    correlation_matrix = np.corrcoef(flipped_matrix.T) 
 
-    # Convert ciphertexts into a matrix
-    original_bits = np.array([int(b) for b in f'{original_ciphertext:016b}'])
-    flipped_matrix = bitwise_matrix(flipped_ciphertexts)
-
-    # Compute correlations between ciphertext bit flips
-    correlation_matrix = np.corrcoef(flipped_matrix.T)  # Transpose to compare bitwise correlation
-
-    # Compute the average off-diagonal correlation (ideal: close to 0)
     n = correlation_matrix.shape[0]
     avg_correlation = (np.sum(np.abs(correlation_matrix)) - n) / (n * (n - 1))
 
@@ -112,15 +96,15 @@ def main():
     
     # Convert text to 16-bit blocks
     blocks = string_to_blocks(plaintext)
-    print(f"Original Blocks: {[bin(b) for b in blocks]}")
+    print(f"Original Block(s): {[bin(b) for b in blocks]}")
     
     # Encrypt
     encrypted_blocks = [encrypt_block(b) for b in blocks]
-    print(f"Encrypted Blocks: {[bin(b) for b in encrypted_blocks]}")
+    print(f"Encrypted Block(s): {[bin(b) for b in encrypted_blocks]}")
     
     # Decrypt
     decrypted_blocks = [decrypt_block(b) for b in encrypted_blocks]
-    print(f"Decrypted Blocks: {[bin(b) for b in decrypted_blocks]}")
+    print(f"Decrypted Block(s): {[bin(b) for b in decrypted_blocks]}")
     
     # Calculate SAC
     for block in blocks:
